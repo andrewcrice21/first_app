@@ -1,0 +1,326 @@
+# Project Specification
+
+Specifications for the single-file web app will be recorded here.
+# Beam Designer
+
+## Purpose
+Shear, moment, and deflection diagrams for a beam, with a check of
+whether the beam is strong and stiff enough.
+
+## Inputs
+- **Support type**
+  - Control: radio buttons or segmented control with “Simply Supported” and “Cantilever.”
+  - Units: none.
+  - Range: two supported options.
+  - Default: none; the user must choose a support type.
+- **Span**
+  - Control: number input.
+  - Units: ft.
+  - Range: 1 to 200 ft.
+  - Default: 20 ft.
+- **Point loads**
+  - Control: repeatable list with Add and Remove buttons; begins with no point loads.
+  - Each row contains:
+    - **Magnitude:** number input in kip, range 0 to 100 kip, default 0 kip.
+    - **Location:** number input for the distance from the nearest support, with dynamic range 0 ft to the maximum distance shown by the beam analysis; default to the midpoint of the span. Units: ft.
+    - **Direction:** dropdown or radio buttons for “Up” or “Down,” with no default; the user must choose for each new row.
+- **Uniform load**
+  - Control: number input; applies over the full span.
+  - Units: kip/ft.
+  - Range: 0 to 10 kip/ft.
+  - Default: 1 kip/ft.
+- **Member family**
+  - Control: dropdown.
+  - Options: Steel or Lumber.
+  - Default: Steel.
+- **Steel grade**
+  - Control: dropdown.
+  - Options: a preset catalog of steel grades.
+  - Default: A36.
+  - Shown only when Member family is Steel.
+- **Steel W-shape**
+  - Control: dropdown.
+  - Options: a preset catalog of common W-shapes.
+  - Default: W12x26.
+  - Shown only when Member family is Steel.
+- **Lumber grade**
+  - Control: dropdown.
+  - Options: a preset catalog of lumber species and grades.
+  - Default: D.Fir-L No.2.
+  - Shown only when Member family is Lumber.
+- **Lumber size**
+  - Control: dropdown.
+  - Options: a preset catalog of common lumber sizes.
+  - Default: 2x10.
+  - Shown only when Member family is Lumber.
+- **Section modulus (Sx)**
+  - Control: editable number input.
+  - Units: in³.
+  - Range: 0.1 to 1000 in³.
+  - Default: the preset value for the selected shape or size.
+- **Moment of inertia (I)**
+  - Control: editable number input.
+  - Units: in⁴.
+  - Range: 0.1 to 10000 in⁴.
+  - Default: the preset value for the selected shape or size.
+- **Modulus of elasticity (E)**
+  - Control: editable number input.
+  - Units: ksi.
+  - Range: 100 to 50000 ksi.
+  - Default: the preset value for the selected member grade.
+- **Allowable bending stress (Fb)**
+  - Control: editable number input.
+  - Units: ksi.
+  - Range: 0.1 to 100 ksi.
+  - Default: the preset value for the selected steel grade or lumber grade.
+
+## Calculations
+- All calculations use:
+  - `L`: span, in ft.
+  - `w`: uniform load, in kip/ft. A positive `w` acts downward.
+  - `P_i`: magnitude of point load `i`, in kip. Point load direction determines its signed value: downward is negative and upward is positive.
+  - `a_i`: point-load location from the nearest support, in ft.
+  - `E`: modulus of elasticity, in ksi.
+  - `I`: moment of inertia about the strong axis, in in⁴.
+  - `S`: section modulus about the strong axis, in in³.
+  - `Fb`: allowable bending stress, in ksi.
+- Reaction forces shall be calculated from static equilibrium:
+  - Sum of vertical forces: `ΣF_y = 0`.
+  - Sum of moments about the left support or fixed end: `ΣM = 0`.
+  - Report left and right reactions for a simply supported beam and the reaction force and fixed-end moment for a cantilever.
+- Shear and moment diagrams shall be calculated along the full span:
+  - Generate values at intervals small enough to preserve load jumps and turn points.
+  - `V(x)` is the signed vertical shear at distance `x` in ft from the left end.
+  - `M(x)` is the signed bending moment at distance `x`, in kip-ft.
+  - Downward loads and their resulting internal forces use the negative vertical sign convention.
+  - Identify `V_max = max(|V(x)|)` and `M_max = max(|M(x)|)`, plus the corresponding locations.
+- Deflection shall be calculated from the Euler-Bernoulli beam equation:
+  - `EI d²y/dx² = M(x)`
+  - Before substitution, convert `E` from ksi to kip/in² and `L`, `x`, and load locations to in.
+  - Calculate signed deflection `y(x)` over the full span using beam theory for the selected support condition.
+  - Enforce:
+    - Simply supported: `y(0) = 0` and `y(L) = 0`.
+    - Cantilever: `y(0) = 0` and `dy/dx(0) = 0`, with the fixed end at `x = 0`.
+  - Identify `y_max = max(|y(x)|)` and its location.
+- Bending stress at a section is:
+  - `fb = |M(x)| × 12 / S`
+  - `fb` is in ksi, `M(x)` is in kip-ft, and `12` converts kip-ft to kip-in.
+  - Compare the maximum bending stress to the allowable stress:
+    - `fb_max = M_max × 12 / S`
+    - Passing bending check when `fb_max ≤ Fb`.
+- Deflection limit:
+  - `L_limit = L × 12 / 360 = L / 30`
+  - `L_limit` is in in.
+  - Passing deflection check when `y_max ≤ L_limit`.
+- Pass/fail status is reported separately for bending and deflection. The app shall also display the governing value and limit for each check.
+
+## Outputs
+- **Beam sketch**
+  - Display a scaled beam-length schematic in the top of the results area.
+  - Show the correct support symbols for simply supported or cantilever conditions.
+  - Draw the uniform-load distribution and downward/upward point-load arrows.
+  - Label each point load with its magnitude and location.
+  - Dimension the span in ft.
+- **Shear diagram**
+  - Display a separate SVG or canvas chart labeled “Shear.”
+  - Show `V(x)` in kip on the vertical axis and distance along the beam in ft on the horizontal axis.
+  - Include a zero axis and identify positive and negative shear using the stated sign convention.
+  - Label `V_max = max(|V(x)|)` with its value and location.
+- **Moment diagram**
+  - Display a separate SVG or canvas chart labeled “Moment.”
+  - Show `M(x)` in kip-ft on the vertical axis and distance along the beam in ft on the horizontal axis.
+  - Include a zero axis and identify positive and negative moment using the stated sign convention.
+  - Label `M_max = max(|M(x)|)` with its value and location.
+- **Deflection diagram**
+  - Display a separate SVG or canvas chart labeled “Deflection.”
+  - Show signed deflection `y(x)` in in on the vertical axis and distance along the beam in ft on the horizontal axis.
+  - Include a zero axis and label `y_max = max(|y(x)|)` with its value and location.
+  - Provide two views:
+    - A true-scale view using the actual deflection magnitude relative to the span.
+    - A magnified/exaggerated view for readability, explicitly labeled “Exaggerated for visibility.”
+- **Calculated reaction summary**
+  - For a simply supported beam, display both vertical reactions in kip.
+  - For a cantilever, display the vertical reaction and fixed-end moment in kip-ft.
+- **Design check summary**
+  - Display separate bending and deflection pass/fail cards.
+  - Bending card: display `fb_max`, `Fb`, and utilization `fb_max / Fb`.
+  - Deflection card: display `y_max`, `L/360`, and utilization `y_max / (L/360)`.
+  - A check passes only when its governing value is less than or equal to its corresponding limit.
+- **Additional governing values**
+  - Permanently show `V_max` and `M_max` with locations.
+  - Permanently show `y_max` and its location.
+  - Permanently show `fb_max` and its location if available.
+- **Numeric formatting**
+  - Display deflection values to two decimal places, including `y_max` and `L/360`.
+  - Display forces, moments, stress, limits, locations, and utilization ratios to three significant figures.
+- **Invalid or incomplete input**
+  - Disable calculation until every required input is valid.
+  - Keep the outputs hidden or clearly marked invalid.
+  - Show a concise warning next to each invalid or incomplete field.
+
+## Look and feel
+- **Visual style**
+  - Use a clean academic-workbook aesthetic with compact tables and restrained blue-gray accents.
+  - Present the interface as a professional engineering tool rather than a decorative or illustrative app.
+- **Theme**
+  - Provide light and dark modes.
+  - Default to light mode.
+  - Use the selected theme consistently across controls, tables, diagrams, status cards, and warnings.
+- **Status colors**
+  - Use green for passing checks.
+  - Use red for failing checks.
+  - Use gray for incomplete or invalid states.
+  - Pair color with text labels such as “PASS,” “FAIL,” or “INCOMPLETE” so status is not conveyed by color alone.
+- **Desktop layout**
+  - Use a fixed left input panel and a wide right results area.
+  - Keep the input panel available while the user works with the outputs.
+  - Separate inputs, beam sketch, diagrams, and summary values into clearly labeled panels.
+- **Mobile layout**
+  - Use collapsible Input and Results sections.
+  - Stack all panels and diagrams vertically on narrow screens.
+  - Preserve the full meaning and labels of diagrams when they become narrow.
+- **Typography**
+  - Use a professional sans-serif font for labels and interface text.
+  - Use engineering-style headings that are compact and clearly hierarchical.
+  - Use tabular figures for values, tables, and calculated results.
+- **Initial state**
+  - Open with all required inputs blank rather than preloaded.
+  - Provide an explicit “Load Example” action.
+  - Until the example is loaded or valid inputs are entered, show no calculated beam or results.
+- **Update behavior**
+  - Validate inputs after every change.
+  - The user must press “Run Calculation” after entering or changing valid inputs.
+  - Disable “Run Calculation” until every required input is valid.
+  - When inputs change after a successful calculation, mark the results as awaiting recalculation and prevent stale values from remaining visible.
+  - When an input becomes invalid, follow the invalid-input behavior defined in the Outputs section.
+
+## Side-by-Side Comparison
+- **Purpose**
+  - Provide a dedicated comparison mode separate from the normal results view.
+  - Allow users to compare complete beam configurations without changing the main input panel.
+- **Saved configurations**
+  - Store unlimited saved configurations in browser `localStorage`.
+  - Persist each configuration's user-editable name, input state, and latest calculated result.
+  - Default names to “Configuration 1,” “Configuration 2,” and so on.
+  - Safely validate loaded records and ignore malformed or missing stored data.
+- **Configuration controls**
+  - Provide a Comparison Mode entry in the app header or toolbar.
+  - Provide Add, Duplicate, Rename, Save, and Delete actions.
+  - Use a saved-configuration list for selection.
+  - Preserve the main input panel and its current values when switching into or out of comparison mode.
+- **A and B panels**
+  - Show separate complete A and B input panels.
+  - Reuse the existing support, span, load, member, grade, shape, section-property, range, preset, and validation controls in both panels.
+  - Give A and B independent “Run Calculation” buttons.
+  - Keep unlimited saved configurations selectable, but use only the user-selected A and B configurations in the print sheet.
+- **Comparison results**
+  - Align current, A, and B values in comparison cards or a table.
+  - Include support type, span, loads, member properties, reactions, Vmax, Mmax, ymax, fbmax, limits, and utilization values.
+  - Highlight only differing result values.
+  - Do not add special highlighting to differing input values.
+  - Mark edited but not-yet-rerun configurations as stale or “Needs recalculation.”
+  - A stale or missing configuration must not display as a valid result.
+- **Responsive behavior**
+  - Use two stacked or collapsible A/B sections on narrow screens.
+  - Preserve separate saved names, run controls, and values when panels stack.
+
+## Printable Calculation Sheet
+- **Print action**
+  - Provide a “Print Calculation Sheet” action in normal and comparison views.
+  - Invoke the browser print dialog with `window.print()`.
+- **Sheet content**
+  - Print the current main-panel result, selected configuration A, and selected configuration B in three columns.
+  - Include project title, print date, and page number in the header.
+  - Include inputs, support and load details, member properties, beam sketch, shear diagram, moment diagram, deflection, reactions, governing values, pass/fail checks, limits, and utilization.
+  - Treat missing or stale results as an explicit warning rather than calculated-looking output.
+- **Print layout**
+  - Use US Letter landscape formatting.
+  - Fit the three columns on one page when content permits.
+  - Repeat readable page headings or break pages if content cannot fit, rather than shrinking content into an unreadable layout.
+  - Hide application navigation, input panels, edit controls, comparison controls, theme controls, and any other non-sheet UI.
+  - Preserve SVG diagrams and black-and-white-readable labels in print output.
+- **Print state**
+  - Light mode may remain the default print appearance, but print output must remain readable if initiated from dark mode.
+  - Print a current calculation plus the two selected saved configurations.
+
+## Validation
+- Store detailed hand calculations and repeatable test data in `02_validation/`.
+- Keep the expected values and acceptance rules for each required case in this section.
+- Compare app outputs with independently calculated expected values to within 0.1%.
+- Use a 29000 ksi modulus of elasticity and the applicable W12x26 properties for all steel validation cases unless a case states otherwise.
+- **Primary simply supported uniform-load case**
+  - Inputs: 20 ft span, simply supported, W12x26, A36 or specified Fb 36 ksi, 1 kip/ft downward uniform load.
+  - Expected reactions: 10 kip at each support.
+  - Expected maximum moment: 50.0 kip-ft at midspan.
+  - Expected maximum deflection: 0.609 in near midspan.
+  - Expected bending stress: approximately 17.96 ksi.
+  - Expected checks: bending PASS and deflection PASS.
+- **No-load case**
+  - Inputs: 10 ft span, simply supported, W12x26, no point loads, 0 kip/ft uniform load.
+  - Expected reactions: 0 kip.
+  - Expected maximum shear: 0 kip.
+  - Expected maximum moment: 0 kip-ft.
+  - Expected maximum deflection: 0 in.
+  - Expected checks: bending PASS and deflection PASS.
+- **Cantilever point-load case**
+  - Inputs: 10 ft span, cantilever, W12x26, 1 kip downward point load at the free end.
+  - Expected vertical fixed reaction: 1 kip.
+  - Expected fixed-end moment: 10 kip-ft.
+  - Expected maximum moment magnitude: 10 kip-ft at the fixed end.
+  - Expected maximum deflection: approximately 0.097 in at the free end.
+- **Cantilever uniform-load case**
+  - Inputs: 10 ft span, cantilever, W12x26, 1 kip/ft downward uniform load.
+  - Expected vertical fixed reaction: 10 kip.
+  - Expected fixed-end moment: 50 kip-ft.
+  - Expected maximum moment magnitude: 50 kip-ft at the fixed end.
+  - Expected maximum deflection: approximately 0.364 in at the free end.
+- **Combined downward point-load case**
+  - Inputs: 10 ft simply supported span, 5 kip downward point load at 3 ft, 5 kip downward point load at 7 ft, and 0.5 kip/ft uniform load.
+  - Expected reactions: 7.5 kip at each support.
+  - Expected maximum moment magnitude: 21.25 kip-ft near midspan.
+- **Upward point-load case**
+  - Inputs: 10 ft simply supported span, 5 kip upward point load at midspan, no uniform load.
+  - Expected reactions: 2.5 kip downward at each support.
+  - Expected maximum moment magnitude: 25 kip-ft at midspan.
+- **Definitely failing bending case**
+  - Inputs: 20 ft simply supported span, W12x26, 10 kip/ft downward uniform load.
+  - Expected reactions: 100 kip at each support.
+  - Expected maximum moment: 500 kip-ft at midspan.
+  - Expected bending stress: approximately 179.64 ksi.
+  - Expected bending check: FAIL.
+  - Expected deflection: approximately 6.06 in.
+- **Definitely failing deflection case**
+  - Inputs: 20 ft simply supported span, W12x26, 15 kip/ft downward uniform load.
+  - Expected maximum deflection: approximately 9.09 in.
+  - Expected deflection limit: 8 in.
+  - Expected deflection check: FAIL.
+- **Validation pass criterion**
+  - All expected scalar values shall agree within 0.1%.
+  - Governing locations shall agree within 0.1 ft.
+  - Pass/fail results shall match exactly.
+  - Validate reactions, shear, moment, deflection, bending stress, utilization, and diagram key points for each applicable case.
+
+## Out of scope
+- Structural systems:
+  - Continuous beams.
+  - Indeterminate beams and frames.
+  - Any support condition other than simply supported or cantilever.
+- Structural checks:
+  - Shear strength.
+  - Torsion.
+  - Lateral-torsional buckling.
+  - Local and global column buckling.
+  - Bearing design.
+  - Connection design.
+- Loading:
+  - Moving loads.
+  - Dynamic loads.
+  - Cyclic loads.
+  - Impact loads.
+  - Only static point loads and full-span uniform loads are supported.
+- Other features:
+  - 3D modeling.
+  - Structural design optimization.
+  - Final engineering drawings.
+  - Code-compliance certification.
+  - Export is not required in the initial app, but may be added in a future implementation.
